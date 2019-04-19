@@ -51,9 +51,9 @@ void loop()
 }
 
 void active_state_display () {
-  fill_solid(leds, NUM_LEDS, CRGB::White);
+  fill_solid(leds, NUM_LEDS, CRGB::Blue);
 }
 
 void idle_state_display () {
-  fill_solid(leds, NUM_LEDS, CRGB::Blue);
+  fill_solid(leds, NUM_LEDS, CRGB::White);
 }
