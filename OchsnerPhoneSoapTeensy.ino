@@ -18,6 +18,9 @@ CRGB leds[NUM_LEDS];
 
 // Presence State Pins (we don't need an idle state pin)
 const int activeStatePin = 13;
+void display_leds ()
+void idle_state_display ();
+void active_state_display ();
 
 void setup() {
   delay(3000); // 3 second delay for recovery
@@ -40,14 +43,16 @@ void loop()
   Serial.print("isActive: ");
   Serial.println(isActive);
 
-  if (!isActive) {
-    active_state_display();
-  }
-  else {
-    idle_state_display();
-  }
+  display_leds(isActive);
   FastLED.show();  
   FastLED.delay(1000/FRAMES_PER_SECOND); 
+}
+
+void display_leds (boolean active) {
+  if (isActive) {
+    return active_state_display();
+  }
+  return idle_state_display();
 }
 
 void active_state_display () {
@@ -57,3 +62,4 @@ void active_state_display () {
 void idle_state_display () {
   fill_solid(leds, NUM_LEDS, CRGB::White);
 }
+
