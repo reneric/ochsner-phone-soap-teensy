@@ -56,7 +56,8 @@ void stateMachine () {
   if (tempState != currentState ) {
     boolean phoneSoapCompleted = tempState == IDLE_STATE && currentState == ACTIVE_STATE;
     boolean inCompletionMode = currentState == COMPLETE_STATE && (millis() - completeStateTimer < COMPLETE_STATE_DELAY);
-    // If the last currentState was "ACTIVE" and the new state is "IDLE", set state to "COMPLETE"
+    // If the last currentState was "ACTIVE" and the new state is "IDLE",
+    // set state to "COMPLETE" and start the completion timer.
     if (phoneSoapCompleted) {
       completeStateTimer = millis();
       currentState = COMPLETE_STATE;
