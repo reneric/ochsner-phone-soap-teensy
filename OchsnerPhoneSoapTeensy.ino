@@ -12,15 +12,19 @@ CRGB leds[NUM_LEDS];
 #define BRIGHTNESS          96
 #define FRAMES_PER_SECOND  120
 
+// The time (ms) for the "complete" state
+const int COMPLETE_STATE_DELAY = 5000; // 5 seconds
+
 // Presence States
-#define ACTIVE_STATE 0
-#define IDLE_STATE 1
+const int IDLE_STATE = 0;
+const int ACTIVE_STATE = 1;
+const int COMPLETE_STATE = 2;
 
 // Presence State Pins (we don't need an idle state pin)
 const int activeStatePin = 13;
-void display_leds ()
-void idle_state_display ();
-void active_state_display ();
+
+int currentState = 0;
+long completeStateTimer = 0;
 
 void setup() {
   delay(3000); // 3 second delay for recovery
@@ -33,33 +37,62 @@ void setup() {
 
   // Set master brightness control
   FastLED.setBrightness(BRIGHTNESS);
+  currentState = 0;
 }
 
 boolean isActive = false;
 
 void loop()
 {
-  isActive = digitalRead(activeStatePin) == HIGH;
-  Serial.print("isActive: ");
-  Serial.println(isActive);
-
-  display_leds(isActive);
+  stateMachine();
   FastLED.show();  
-  FastLED.delay(1000/FRAMES_PER_SECOND); 
+  FastLED.delay(1000/FRAMES_PER_SECOND);
 }
 
-void display_leds (boolean active) {
-  if (isActive) {
-    return active_state_display();
+void stateMachine () {
+  // Get the current sensor state
+  int tempState = getState();
+
+  if (tempState != currentState ) {
+    boolean phoneSoapCompleted = tempState == IDLE_STATE && currentState == ACTIVE_STATE;
+    boolean inCompletionMode = currentState == COMPLETE_STATE && (millis() - completeStateTimer < COMPLETE_STATE_DELAY);
+    // If the last currentState was "ACTIVE" and the new state is "IDLE", set state to "COMPLETE"
+    if (phoneSoapCompleted) {
+      completeStateTimer = millis();
+      currentState = COMPLETE_STATE;
+    }
+    
+    currentState = inCompletionMode ? COMPLETE_STATE : tempState;
   }
-  return idle_state_display();
+  switch (currentState) {
+    case ACTIVE_STATE:
+      setActive();
+      break;
+    case COMPLETE_STATE:
+      setComplete();
+      break;
+    default:
+      setIdle();
+      break;
+  }
 }
 
-void active_state_display () {
+int getState () {
+  return digitalRead(activeStatePin) == HIGH;
+}
+
+void setActive () {
+  Serial.println("ACTIVE");
   fill_solid(leds, NUM_LEDS, CRGB::Blue);
 }
 
-void idle_state_display () {
+void setComplete () {
+  Serial.println("COMPLETE");
+  fill_solid(leds, NUM_LEDS, CRGB::Green);
+}
+
+void setIdle () {
+  Serial.println("IDLE");
   fill_solid(leds, NUM_LEDS, CRGB::White);
 }
 
