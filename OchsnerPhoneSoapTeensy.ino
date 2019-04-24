@@ -1,11 +1,13 @@
 #include <FastLED.h>
 
+#define DEBUG 1
+
 FASTLED_USING_NAMESPACE
 
 #define DATA_PIN    3
 #define LED_TYPE    WS2811
 #define COLOR_ORDER GRB
-#define NUM_LEDS    106
+#define NUM_LEDS    60
 
 CRGB leds[NUM_LEDS];
 
@@ -22,9 +24,18 @@ const int COMPLETE_STATE = 2;
 
 // Presence State Pins (we don't need an idle state pin)
 const int activeStatePin = 13;
+const int togglePin = 14;
 
 int currentState = 0;
 long completeStateTimer = 0;
+boolean deviceOff ();
+
+CRGBPalette16 currentPalette;
+TBlendType    currentBlending;
+
+extern CRGBPalette16 myRedWhiteBluePalette;
+extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
+
 
 void setup() {
   delay(3000); // 3 second delay for recovery
@@ -32,19 +43,33 @@ void setup() {
   Serial.println("STARTING...");
   
   pinMode(activeStatePin, INPUT);
+  pinMode(togglePin, INPUT);
 
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
 
   // Set master brightness control
   FastLED.setBrightness(BRIGHTNESS);
   currentState = 0;
+
+  currentPalette = RainbowColors_p;
+  currentBlending = LINEARBLEND;
 }
 
 void loop()
 {
-  stateMachine();
+  if (digitalRead(togglePin) == LOW) {
+    FastLED.clear();
+  }
+  else {
+    stateMachine();
+  }
+  
   FastLED.show();  
   FastLED.delay(1000/FRAMES_PER_SECOND);
+}
+
+boolean deviceOff () {
+  return digitalRead(togglePin) == LOW;
 }
 
 void stateMachine () {
@@ -82,17 +107,174 @@ int getState () {
 }
 
 void setActive () {
+#if DEBUG == 1  
   Serial.println("ACTIVE");
+#endif
   fill_solid(leds, NUM_LEDS, CRGB::Blue);
+  // juggle();
 }
 
 void setComplete () {
+#if DEBUG == 1
   Serial.println("COMPLETE");
+#endif
   fill_solid(leds, NUM_LEDS, CRGB::Green);
 }
 
 void setIdle () {
+#if DEBUG == 1
   Serial.println("IDLE");
+#endif
   fill_solid(leds, NUM_LEDS, CRGB::White);
 }
+
+uint8_t gHue = 0;
+
+void fadeall() { for(int i = 0; i < NUM_LEDS; i++) { leds[i].nscale8(250); } }
+
+void cylon () {
+  static uint8_t hue = 0;
+  Serial.print("x");
+  // First slide the led in one direction
+  for(int i = 0; i < NUM_LEDS; i++) {
+    // Set the i'th led to red 
+    leds[i] = CHSV(hue++, 255, 255);
+    // Show the leds
+    FastLED.show(); 
+    // now that we've shown the leds, reset the i'th led to black
+    // leds[i] = CRGB::Black;
+    fadeall();
+    // Wait a little bit before we loop around and do it again
+    delay(10);
+  }
+  Serial.print("x");
+
+  // Now go in the other direction.  
+  for(int i = (NUM_LEDS)-1; i >= 0; i--) {
+    // Set the i'th led to red 
+    leds[i] = CHSV(hue++, 255, 255);
+    // Show the leds
+    FastLED.show();
+    // now that we've shown the leds, reset the i'th led to black
+    // leds[i] = CRGB::Black;
+    fadeall();
+    // Wait a little bit before we loop around and do it again
+    delay(10);
+  }
+}
+
+void sinelon()
+{
+  // a colored dot sweeping back and forth, with fading trails
+  fadeToBlackBy( leds, NUM_LEDS, 20);
+  int pos = beatsin16( 13, 0, NUM_LEDS-1 );
+  leds[pos] += CHSV( gHue, 255, 192);
+}
+
+void juggle() {
+  // eight colored dots, weaving in and out of sync with each other
+  fadeToBlackBy( leds, NUM_LEDS, 20);
+  byte dothue = 0;
+  for( int i = 0; i < 8; i++) {
+    leds[beatsin16( i+7, 0, NUM_LEDS-1 )] |= CHSV(dothue, 200, 255);
+    dothue += 32;
+  }
+}
+
+void FillLEDsFromPaletteColors( uint8_t colorIndex)
+{
+    uint8_t brightness = 255;
+    
+    for( int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = ColorFromPalette( currentPalette, colorIndex, brightness, currentBlending);
+        colorIndex += 3;
+    }
+}
+
+void ChangePalettePeriodically()
+{
+    uint8_t secondHand = (millis() / 1000) % 60;
+    static uint8_t lastSecond = 99;
+    
+    if( lastSecond != secondHand) {
+        lastSecond = secondHand;
+        if( secondHand ==  0)  { currentPalette = RainbowColors_p;         currentBlending = LINEARBLEND; }
+        if( secondHand == 10)  { currentPalette = RainbowStripeColors_p;   currentBlending = NOBLEND;  }
+        if( secondHand == 15)  { currentPalette = RainbowStripeColors_p;   currentBlending = LINEARBLEND; }
+        if( secondHand == 20)  { SetupPurpleAndGreenPalette();             currentBlending = LINEARBLEND; }
+        if( secondHand == 25)  { SetupTotallyRandomPalette();              currentBlending = LINEARBLEND; }
+        if( secondHand == 30)  { SetupBlackAndWhiteStripedPalette();       currentBlending = NOBLEND; }
+        if( secondHand == 35)  { SetupBlackAndWhiteStripedPalette();       currentBlending = LINEARBLEND; }
+        if( secondHand == 40)  { currentPalette = CloudColors_p;           currentBlending = LINEARBLEND; }
+        if( secondHand == 45)  { currentPalette = PartyColors_p;           currentBlending = LINEARBLEND; }
+        if( secondHand == 50)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = NOBLEND;  }
+        if( secondHand == 55)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = LINEARBLEND; }
+    }
+}
+
+// This function fills the palette with totally random colors.
+void SetupTotallyRandomPalette()
+{
+    for( int i = 0; i < 16; i++) {
+        currentPalette[i] = CHSV( random8(), 255, random8());
+    }
+}
+
+// This function sets up a palette of black and white stripes,
+// using code.  Since the palette is effectively an array of
+// sixteen CRGB colors, the various fill_* functions can be used
+// to set them up.
+void SetupBlackAndWhiteStripedPalette()
+{
+    // 'black out' all 16 palette entries...
+    fill_solid( currentPalette, 16, CRGB::Black);
+    // and set every fourth one to white.
+    currentPalette[0] = CRGB::White;
+    currentPalette[4] = CRGB::White;
+    currentPalette[8] = CRGB::White;
+    currentPalette[12] = CRGB::White;
+    
+}
+
+// This function sets up a palette of purple and green stripes.
+void SetupPurpleAndGreenPalette()
+{
+    CRGB purple = CHSV( HUE_PURPLE, 255, 255);
+    CRGB green  = CHSV( HUE_GREEN, 255, 255);
+    CRGB black  = CRGB::Black;
+    
+    currentPalette = CRGBPalette16(
+                                   green,  green,  black,  black,
+                                   purple, purple, black,  black,
+                                   green,  green,  black,  black,
+                                   purple, purple, black,  black );
+}
+
+
+// This example shows how to set up a static color palette
+// which is stored in PROGMEM (flash), which is almost always more
+// plentiful than RAM.  A static PROGMEM palette like this
+// takes up 64 bytes of flash.
+const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM =
+{
+    CRGB::Red,
+    CRGB::Gray, // 'white' is too bright compared to red and blue
+    CRGB::Blue,
+    CRGB::Black,
+    
+    CRGB::Red,
+    CRGB::Gray,
+    CRGB::Blue,
+    CRGB::Black,
+    
+    CRGB::Red,
+    CRGB::Red,
+    CRGB::Gray,
+    CRGB::Gray,
+    CRGB::Blue,
+    CRGB::Blue,
+    CRGB::Black,
+    CRGB::Black
+};
+
 
