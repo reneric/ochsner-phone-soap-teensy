@@ -105,7 +105,7 @@ void setActive () {
   // fill_solid(leds, NUM_LEDS, CRGB::Blue);
     
     static uint8_t startIndex = 0;
-    startIndex = startIndex + 1; /* motion speed */
+    startIndex = startIndex + 2; /* motion speed */
     
     FillLEDsFromPaletteColors( startIndex);
 }
@@ -181,7 +181,7 @@ void FillLEDsFromPaletteColors( uint8_t colorIndex)
 {
     for( int i = 0; i < NUM_LEDS; i++) {
         leds[i] = ColorFromPalette( SetupActivePalette(), colorIndex, BRIGHTNESS, LINEARBLEND);
-        colorIndex += 5;
+        colorIndex += 1;
     }
 }
 
